@@ -13,38 +13,48 @@
 
 int main(int argc, char * argv[]){
 
-	struct sockaddr_in local_addr;
+	/*select*/
+	int=maxfd;
+	fd_set rfds;
+
+	/*guardar fd de players(depois lista quiçá)*/	
 	int *players;
 
+	/*verificação argumentos de entrada para dim*/
 	if(argc<2){
 		printf("Incorrect arguments!\n");
 		exit(-1);
 	}
+	int dim=argv[1];
 
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
 
+	/*criar socket de listen*/
+	struct sockaddr_in local_addr;
+	int lst_fd = socket(AF_INET, SOCK_STREAM, 0);
 	if(fd==-1){
 		perror("socket: ");
 		exit(-1);
 	}
-
 	local_addr.sin_family=AF_INET;
 	local_addr.sin_port=htons(PORT);
 	local_addr.sin_addr.s_addr=INADDR_ANY;
 
-	if(bind(fd, (struct sockaddr *)&local_addr, sizeof(local_addr))==-1){
+	/*bind*/
+	if(bind(lst_fd, (struct sockaddr *)&local_addr, sizeof(local_addr))==-1){
 		perror("bind: ");
 		exit(-1);
 	}
-
-	listen(fd, 5);
+	/*listen*/
+	listen(lst_fd, 5);
 
 	while(1){
 
-		players[0]=accept(fd, NULL, NULL);
-		printf("Player connected!\n");
+		FD_SET(&
 
-		
+			)
+
+		players[0]=accept(lst_fd, NULL, NULL);
+		printf("Player connected!\n");
 
 	}
 
