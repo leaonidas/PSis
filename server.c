@@ -7,15 +7,29 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <signal.h>
+#include <time.h>
+#include <sys/wait.h>
+#include <sys/types.h>
 
 #define PORT 3000
+#define WAITSP 5
 
+int count=0;
+
+void ALARMhandler(int sig){
+    signal(SIGALRM, SIG_IGN);
+    count=-1;
+    printf("alarmou a gritar\n");
+    printf("count tem de ser -1= %d\n", count);
+    signal(SIGALRM, ALARMhandler);
+}
 
 int main(int argc, char * argv[]){
 
 
     /*guardar fd de players(depois lista quiçá)*/	
-    int pfd;
+    int pfd, done=0, nsec=0;
     //player *plist;
 
 
@@ -58,9 +72,17 @@ int main(int argc, char * argv[]){
         
     write(pfd, &dim, sizeof(dim));
     int score=0;
-    int done=0;
-
+    play_response resp;
+    
     while(!done){
+        
+        if(count==-1){
+            printf("ENTROU\n");
+            resp.code=-1;
+            write(pfd, &resp, sizeof(resp));
+            resp.play1[0]=-1;
+            count=0;
+        }
         
         int board_x, board_y;
         read(pfd, &board_x, sizeof(board_x));
@@ -70,11 +92,18 @@ int main(int argc, char * argv[]){
         printf("board_x= %d\n", board_x);
         printf("board_x= %d\n", board_y);
         
-        play_response resp=board_play(board_x, board_y);
+        resp=board_play(board_x, board_y);
         if(resp.code==2) score++;
-        printf("responde code: %d", resp.code);
+        printf("responde code: %d\n", resp.code);
         write(pfd, &resp, sizeof(resp));
         
+        if(resp.code==1){
+            signal(SIGALRM, ALARMhandler);
+            alarm(WAITSP);
+        }
+        else{
+            alarm(0);
+        }
         if(resp.code==3){
             score++;
             write(pfd, &score, sizeof(score));
