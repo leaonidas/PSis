@@ -7,42 +7,111 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+//#include "client_library.h"
 
 #define PORT 3000
 
+
 int main(int argc, char * argv[]){
+    
+    int dim;
+    
+    /*init events*/
+    SDL_Event event;
+    int done=0;
+    if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
+        printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        exit(-1);
+    }
+    if(TTF_Init()==-1) {
+        printf("TTF_Init: %s\n", TTF_GetError());
+        exit(2);
+    }
+    
+    /*arguments*/
+    if(argc<2){
+        printf("Incorrect arguments!\n");
+        exit(-1);
+    }
 
-	struct sockaddr_in server_addr;
+    /*create socket*/
+    int sfd = socket(AF_INET, SOCK_STREAM, 0);
 
-	if(argc<2){
-		printf("Incorrect arguments!\n");
-		exit(-1);
-	}
+    if(sfd==-1){
+        perror("socket: ");
+        exit(-1);
+    }
+    
+    struct sockaddr_in server_addr;
+    server_addr.sin_family=AF_INET;
+    server_addr.sin_port=htons(PORT);
+    inet_aton(argv[1], &server_addr.sin_addr);
 
-	int fd = socket(AF_INET, SOCK_STREAM, 0);
+    /*connect*/
+    if(connect(sfd, (const struct sockaddr *) &server_addr, sizeof(server_addr))==-1){
+        printf("Error connecting!\n");
+        exit(-1);
+    }
+    printf("Connected!\n");
 
-	if(fd==-1){
-		perror("socket: ");
-		exit(-1);
-	}
+    /*read dimension and create board*/
+    read(sfd, &dim, sizeof(dim));
+    
+    printf("dim= %d\n", dim);
+    
+    create_board_window(300, 300, dim);
 
-	server_addr.sin_family=AF_INET;
-	server_addr.sin_port=htons(PORT);
-	inet_aton(argv[1], &server_addr.sin_addr);
+    while(!done){
+        while(SDL_PollEvent(&event)){
+            switch(event.type){
+                case SDL_QUIT: {
+                    done=SDL_TRUE;
+                    break;
+                }
+                case SDL_MOUSEBUTTONDOWN:{
+                    int board_x, board_y;
+                    get_board_card(event.button.x, event.button.y, &board_x, &board_y);
+                    write(sfd, &board_x, sizeof(board_x));
+                    write(sfd, &board_y, sizeof(board_y));
+                    
+                    play_response resp;
+                    read(sfd, &resp, sizeof(resp));
+                    printf("code in resp: %d\n", resp.code);
+                    
+                    switch (resp.code) {
+                        case 1:
+                            paint_card(resp.play1[0], resp.play1[1] , 7, 200, 100);
+                            write_card(resp.play1[0], resp.play1[1], resp.str_play1, 200, 200, 200);
+                            break;
+                        case 3:
+                            done = 1;
+                        case 2:
+                            paint_card(resp.play1[0], resp.play1[1] , 107, 200, 100);
+                            write_card(resp.play1[0], resp.play1[1], resp.str_play1, 0, 0, 0);
+                            paint_card(resp.play2[0], resp.play2[1] , 107, 200, 100);
+                            write_card(resp.play2[0], resp.play2[1], resp.str_play2, 0, 0, 0);
+                            break;
+                        case -2:
+                            paint_card(resp.play1[0], resp.play1[1] , 107, 200, 100);
+                            write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 0, 0);
+                            paint_card(resp.play2[0], resp.play2[1] , 107, 200, 100);
+                            write_card(resp.play2[0], resp.play2[1], resp.str_play2, 255, 0, 0);
+                            sleep(2);
+                            paint_card(resp.play1[0], resp.play1[1] , 255, 255, 255);
+                            paint_card(resp.play2[0], resp.play2[1] , 255, 255, 255);
+                            break;
+                      }
+                }
+            }
+        }
 
-	if(connect(fd, (const struct sockaddr *) &server_addr, sizeof(server_addr))==-1){
-		printf("Error connecting!\n");
-		exit(-1);
-	}
-	printf("Connected!\n");
-
-	while(1){
-		
-		
-		
-	}
-
-	//
-
-
+    }
+    
+    int score;
+    read(sfd, &score, sizeof(score));
+    printf("WINNER SCORE: %d\n", score);
+    
+    printf("fim\n");
+    close_board_windows();
+    
 }

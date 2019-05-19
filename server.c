@@ -13,50 +13,76 @@
 
 int main(int argc, char * argv[]){
 
-	/*select*/
-	int=maxfd;
-	fd_set rfds;
 
-	/*guardar fd de players(depois lista quiçá)*/	
-	int *players;
-
-	/*verificação argumentos de entrada para dim*/
-	if(argc<2){
-		printf("Incorrect arguments!\n");
-		exit(-1);
-	}
-	int dim=argv[1];
+    /*guardar fd de players(depois lista quiçá)*/	
+    int pfd;
+    //player *plist;
 
 
-	/*criar socket de listen*/
-	struct sockaddr_in local_addr;
-	int lst_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if(fd==-1){
-		perror("socket: ");
-		exit(-1);
-	}
-	local_addr.sin_family=AF_INET;
-	local_addr.sin_port=htons(PORT);
-	local_addr.sin_addr.s_addr=INADDR_ANY;
+    /*verificação argumentos de entrada para dim*/
+    if(argc<2){
+        printf("Incorrect arguments!\n");
+        exit(-1);
+    }
+    int dim=atoi(argv[1]);
 
-	/*bind*/
-	if(bind(lst_fd, (struct sockaddr *)&local_addr, sizeof(local_addr))==-1){
-		perror("bind: ");
-		exit(-1);
-	}
-	/*listen*/
-	listen(lst_fd, 5);
+    printf("%d\n", dim);
 
-	while(1){
+    /*criar socket de listen*/
+    struct sockaddr_in local_addr;
+    int lst_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if(lst_fd==-1){
+        perror("socket: ");
+        exit(-1);
+    }
+    local_addr.sin_family=AF_INET;
+    local_addr.sin_port=htons(PORT);
+    local_addr.sin_addr.s_addr=INADDR_ANY;
 
-		FD_SET(&
+    /*bind*/
+    if(bind(lst_fd, (struct sockaddr *)&local_addr,   sizeof(local_addr))==-1){
+      perror("bind: ");
+      exit(-1);
+    }
+    
+    /*init board*/
+    init_board(dim);
+    
+    /*listen*/
+    listen(lst_fd, 5);
+    
+    /*add player*/
+    pfd=accept(lst_fd, NULL, NULL);
+    printf("Player connected!\n");
 
-			)
+        
+    write(pfd, &dim, sizeof(dim));
+    int score=0;
+    int done=0;
 
-		players[0]=accept(lst_fd, NULL, NULL);
-		printf("Player connected!\n");
-
-	}
+    while(!done){
+        
+        int board_x, board_y;
+        read(pfd, &board_x, sizeof(board_x));
+        read(pfd, &board_y, sizeof(board_y));
+        
+        
+        printf("board_x= %d\n", board_x);
+        printf("board_x= %d\n", board_y);
+        
+        play_response resp=board_play(board_x, board_y);
+        if(resp.code==2) score++;
+        printf("responde code: %d", resp.code);
+        write(pfd, &resp, sizeof(resp));
+        
+        if(resp.code==3){
+            score++;
+            write(pfd, &score, sizeof(score));
+            done=1;
+        }
+        
+    }
+    
 
 	//connect(fd, (const struct sockaddr *) &server_addr, sizeof(server_addr));
 
