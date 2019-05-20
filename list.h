@@ -8,7 +8,7 @@ typedef struct player{
     int g;
     int b;
     int fplay[2];
-    int pflag;
+    //int pflag;
     int score;
     struct player *next;
 } player;

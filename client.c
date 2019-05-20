@@ -17,8 +17,10 @@
 
 void *listenserver(void *pass){
     
-    int *sfdpointer=pass;
-    int sfd=*sfdpointer;
+    /*int *sfdpointer=pass;
+    int sfd=*sfdpointer;*/
+    
+    int sfd=*(int*) pass;
     
     int done=0;
     play_response resp;
@@ -114,6 +116,8 @@ int main(int argc, char * argv[]){
 
     pthread_t lst_thread;
     
+    /*thread to receive messages from server*/
+    /*passing arguments to the thread*/
     int *pass;
     pass=malloc(sizeof(int));
     *pass=sfd;
@@ -144,6 +148,8 @@ int main(int argc, char * argv[]){
     
     printf("fim\n");
     close_board_windows();
+    
+    free(pass);
     
 }
 

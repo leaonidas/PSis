@@ -1,7 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-#include "board_library.h"
+#include "server_library.h"
 #include "UI_library.h"
 #include <unistd.h>
 #include <stdio.h>
@@ -11,6 +11,8 @@
 #include <time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <pthread.h>
+
 
 #define PORT 3000
 #define WAITSP 5
@@ -23,6 +25,23 @@ void ALARMhandler(int sig){
     printf("alarmou a gritar\n");
     printf("count tem de ser -1= %d\n", count);
     signal(SIGALRM, ALARMhandler);
+}
+
+
+
+void *listenalarm(void *pass){
+    struct alarmstruct *alarmptr = (struct alarmstruct *) pass;
+    
+    while(count!=0 || count!=1){
+        if(count==-1){
+            printf("ENTROU\n");
+            alarmptr->resp.code=-1;
+            write(alarmptr->pfd, &alarmptr->resp, sizeof(alarmptr->resp));
+            alarmptr->resp.play1[0]=-1;
+            count=0;
+        }
+    }
+    return 0;
 }
 
 int main(int argc, char * argv[]){
@@ -69,22 +88,17 @@ int main(int argc, char * argv[]){
     pfd=accept(lst_fd, NULL, NULL);
     printf("Player connected!\n");
 
-        
+    /*send dim*/
     write(pfd, &dim, sizeof(dim));
     int score=0;
     play_response resp;
+    int board_x, board_y; 
+    
+    pthread_t alarm_thread;
+    alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
     
     while(!done){
-        
-        if(count==-1){
-            printf("ENTROU\n");
-            resp.code=-1;
-            write(pfd, &resp, sizeof(resp));
-            resp.play1[0]=-1;
-            count=0;
-        }
-        
-        int board_x, board_y;
+
         read(pfd, &board_x, sizeof(board_x));
         read(pfd, &board_y, sizeof(board_y));
         
@@ -100,9 +114,14 @@ int main(int argc, char * argv[]){
         if(resp.code==1){
             signal(SIGALRM, ALARMhandler);
             alarm(WAITSP);
+            alarmptr->resp=resp;
+            alarmptr->pfd=pfd;
+            pthread_create(&alarm_thread, NULL, listenalarm, alarmptr);
         }
         else{
             alarm(0);
+            count=1;
+            pthread_cancel(alarm_thread);
         }
         if(resp.code==3){
             score++;
@@ -112,8 +131,8 @@ int main(int argc, char * argv[]){
         
     }
     
+    free(alarmptr);
 
-	//connect(fd, (const struct sockaddr *) &server_addr, sizeof(server_addr));
 
 
 }
