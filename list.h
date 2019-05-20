@@ -7,7 +7,8 @@ typedef struct player{
     int r;
     int g;
     int b;
-    int fplay[2];
+    int board_x;
+    int board_y;
     //int pflag;
     int score;
     struct player *next;
@@ -15,3 +16,4 @@ typedef struct player{
 
 void addplayer(player **plist, int fd);
 void removeplayer(player **plist, int fd);
+void printlist(player *plist);

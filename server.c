@@ -12,6 +12,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <pthread.h>
+#include "list.h"
 
 
 #define PORT 3000
@@ -84,13 +85,10 @@ int main(int argc, char * argv[]){
     /*listen*/
     listen(lst_fd, 5);
     
-    /*add player*/
-    pfd=accept(lst_fd, NULL, NULL);
-    printf("Player connected!\n");
-
-    /*send dim*/
-    write(pfd, &dim, sizeof(dim));
-    int score=0;
+    /*initializes player list*/
+    player *plist=NULL;
+    
+    
     play_response resp;
     int board_x, board_y; 
     
@@ -98,6 +96,19 @@ int main(int argc, char * argv[]){
     alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
     
     while(!done){
+        
+        /*add player*/
+        pfd=accept(lst_fd, NULL, NULL);
+        printf("Player connected!\n");
+    
+        /*adds player one to the list*/
+        addplayer(&plist, pfd);
+        printlist(plist);
+
+        /*send dim*/
+        write(pfd, &dim, sizeof(dim));
+        int score=0;
+        
 
         read(pfd, &board_x, sizeof(board_x));
         read(pfd, &board_y, sizeof(board_y));
