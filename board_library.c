@@ -117,3 +117,7 @@ play_response board_play(int x, int y){
     }
   return resp;
 }
+
+void changeplay(int x){
+  play1[0]=x;
+}

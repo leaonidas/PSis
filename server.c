@@ -1,7 +1,10 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-#include "server_library.h"
+//#include "server_library.h"
+
+//#include "board_library.h"
+#include "list.h"
 #include "UI_library.h"
 #include <unistd.h>
 #include <stdio.h>
@@ -12,44 +15,95 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <pthread.h>
-#include "list.h"
+//#include "list.h"
+
 
 
 #define PORT 3000
 #define WAITSP 5
 
-int count=0;
+int done=0;
 
-void ALARMhandler(int sig){
-    signal(SIGALRM, SIG_IGN);
-    count=-1;
-    printf("alarmou a gritar\n");
-    printf("count tem de ser -1= %d\n", count);
-    signal(SIGALRM, ALARMhandler);
+static void handler(int signum){
+    pthread_exit(NULL);
 }
-
-
 
 void *listenalarm(void *pass){
     struct alarmstruct *alarmptr = (struct alarmstruct *) pass;
     
-    while(count!=0 || count!=1){
-        if(count==-1){
+    time_t before=time(NULL);
+
+    while(1){
+        if(time(NULL)-before>=WAITSP){
             printf("ENTROU\n");
-            alarmptr->resp.code=-1;
-            write(alarmptr->pfd, &alarmptr->resp, sizeof(alarmptr->resp));
-            alarmptr->resp.play1[0]=-1;
-            count=0;
+            alarmptr->resp->code=-1;
+            write(alarmptr->pfd, alarmptr->resp, sizeof(*alarmptr->resp));
+            alarmptr->resp->play1[0]=-1;
+            *(alarmptr->bip)=0;
+            changeplay(-1);
+            pthread_exit(pthread_self());
         }
     }
     return 0;
+}
+
+void *plays(void *pass){
+    struct player *p = (struct player *) pass;
+
+    signal(SIGUSR1, handler);
+
+    int board_x, board_y;
+    int bip=0;
+
+    pthread_t alarm_thread;
+    alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
+
+    while(!done){
+
+        read(p->pfd, &board_x, sizeof(board_x));
+        read(p->pfd, &board_y, sizeof(board_y));
+        
+        printf("BIP: %d\n", bip);
+        printf("board_x= %d\n", board_x);
+        printf("board_y= %d\n", board_y);
+        printf("resp play depois de 5 sec %d\n", p->resp->play1[0]);
+        
+        *(p->resp)=board_play(board_x, board_y);
+        if(p->resp->code==2) p->score++;
+        printf("resp play depois de board play %d\n", p->resp->play1[0]);
+        printf("responde code: %d\n", p->resp->code);
+        write(p->pfd, p->resp, sizeof(*(p->resp)));
+        
+        if(p->resp->code==1){
+            alarmptr->resp=p->resp;
+            alarmptr->pfd=p->pfd;
+            alarmptr->bip=&bip;
+            pthread_create(&alarm_thread, NULL, listenalarm, alarmptr);
+            bip=1;
+        }
+        else if(bip==1){
+            printf("entrou alarm kill\n");
+            pthread_kill(alarm_thread, SIGUSR1);
+            pthread_join(alarm_thread, NULL);
+            bip=0;
+        }
+        if(p->resp->code==3){
+            p->score++;
+            done=1;
+            write(p->pfd, &p->score, sizeof(p->score));
+
+        }
+    }
+
+    free(alarmptr);
+    pthread_exit(pthread_self());
 }
 
 int main(int argc, char * argv[]){
 
 
     /*guardar fd de players(depois lista quiçá)*/	
-    int pfd, done=0, nsec=0;
+    int pfd, nsec=0;
     //player *plist;
 
 
@@ -89,12 +143,6 @@ int main(int argc, char * argv[]){
     player *plist=NULL;
     
     
-    play_response resp;
-    int board_x, board_y; 
-    
-    pthread_t alarm_thread;
-    alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
-    
     while(!done){
         
         /*add player*/
@@ -107,43 +155,18 @@ int main(int argc, char * argv[]){
 
         /*send dim*/
         write(pfd, &dim, sizeof(dim));
-        int score=0;
-        
 
-        read(pfd, &board_x, sizeof(board_x));
-        read(pfd, &board_y, sizeof(board_y));
-        
-        
-        printf("board_x= %d\n", board_x);
-        printf("board_x= %d\n", board_y);
-        
-        resp=board_play(board_x, board_y);
-        if(resp.code==2) score++;
-        printf("responde code: %d\n", resp.code);
-        write(pfd, &resp, sizeof(resp));
-        
-        if(resp.code==1){
-            signal(SIGALRM, ALARMhandler);
-            alarm(WAITSP);
-            alarmptr->resp=resp;
-            alarmptr->pfd=pfd;
-            pthread_create(&alarm_thread, NULL, listenalarm, alarmptr);
-        }
-        else{
-            alarm(0);
-            count=1;
-            pthread_cancel(alarm_thread);
-        }
-        if(resp.code==3){
-            score++;
-            write(pfd, &score, sizeof(score));
-            done=1;
-        }
+        pthread_create(&plist->plays_thread, NULL, plays, plist);
         
     }
-    
-    free(alarmptr);
 
+    player *aux=plist;
+    while(aux!=NULL){
+        free(aux->resp);
+        removefirst(&plist);
+        aux=plist;
+    }
 
+    return 0;
 
 }

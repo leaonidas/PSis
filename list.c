@@ -4,31 +4,33 @@
 #include "list.h"
 
 
-void addplayer(player **plist, int fd){
+void addplayer(player **plist, int pfd){
     player *new=(player *)malloc(sizeof(player));
     
-    new->fd=fd;
+    new->pfd=pfd;
     new->next=*plist;
+    new->score=0;
+    new->resp=malloc(sizeof(new->resp));
     *plist=new;
     return;
 }
 
-void removeplayer(player **plist, int fd){
+void removebyfd(player **plist, int pfd){
     player *aux, *remove;
     
     if((*plist)->next==NULL){
-        if((*plist)->fd==fd)
+        if((*plist)->pfd==pfd)
             free(*plist);
     }
     else{
-        if((*plist)->fd==fd){
+        if((*plist)->pfd==pfd){
             remove=(*plist);
             *plist=(*plist)->next;
             free(remove);
         }
         aux=*plist;
         while(aux->next!=NULL){
-            if(aux->next->fd==fd){
+            if(aux->next->pfd==pfd){
                 remove=aux->next;
                 aux->next=aux->next->next;
                 free(remove);
@@ -38,13 +40,23 @@ void removeplayer(player **plist, int fd){
     }
 }
 
+void removefirst(player **plist){
+    player *remove;
+
+    remove=*plist;
+
+    *plist=(*plist)->next;
+    free(remove);
+}
+
 void printlist(player *plist){
     player *aux=plist;
     int i=0;
     
     while(aux!=NULL){
-        printf("Player %d fd is: %d\n",i, aux->fd);
+        printf("Player %d fd is: %d\n",i, aux->pfd);
         i++;
         aux=aux->next;
     }
 }
+
