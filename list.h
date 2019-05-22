@@ -21,6 +21,11 @@ typedef struct player{
     struct player *next;
 } player;
 
+typedef struct acceptstruct{
+    player *plist;
+    int dim;
+}acceptstruct;
+
 void addplayer(player **plist, int fd);
 void removeplayer(player **plist, int fd);
 void removefirst(player **plist);

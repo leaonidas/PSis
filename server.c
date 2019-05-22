@@ -58,7 +58,7 @@ void *plays(void *pass){
     pthread_t alarm_thread;
     alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
 
-    while(!done){
+    while(1){
 
         read(p->pfd, &board_x, sizeof(board_x));
         read(p->pfd, &board_y, sizeof(board_y));
@@ -89,33 +89,23 @@ void *plays(void *pass){
         }
         if(p->resp->code==3){
             p->score++;
-            done=1;
             write(p->pfd, &p->score, sizeof(p->score));
+            done=1;
+            printf("done= %d\n", done);
+            printf("saiu thread\n");
+            free(alarmptr);
+            pthread_exit(pthread_self());
 
         }
     }
-
-    free(alarmptr);
-    pthread_exit(pthread_self());
 }
 
-int main(int argc, char * argv[]){
 
-
-    /*guardar fd de players(depois lista quiçá)*/	
-    int pfd, nsec=0;
-    //player *plist;
-
-
-    /*verificação argumentos de entrada para dim*/
-    if(argc<2){
-        printf("Incorrect arguments!\n");
-        exit(-1);
-    }
-    int dim=atoi(argv[1]);
-
-    printf("%d\n", dim);
-
+void *accept_thread(void *pass){
+    
+    struct acceptstruct *acpt = (struct acceptstruct *) pass;
+    int pfd;
+    
     /*criar socket de listen*/
     struct sockaddr_in local_addr;
     int lst_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -133,40 +123,70 @@ int main(int argc, char * argv[]){
       exit(-1);
     }
     
-    /*init board*/
-    init_board(dim);
-    
     /*listen*/
     listen(lst_fd, 5);
     
-    /*initializes player list*/
-    player *plist=NULL;
-    
-    
-    while(!done){
+    while(1){
         
         /*add player*/
         pfd=accept(lst_fd, NULL, NULL);
         printf("Player connected!\n");
     
         /*adds player one to the list*/
-        addplayer(&plist, pfd);
-        printlist(plist);
+        addplayer(&(acpt->plist), pfd);
+        printlist(acpt->plist);
 
         /*send dim*/
-        write(pfd, &dim, sizeof(dim));
+        write(pfd, &acpt->dim, sizeof(acpt->dim));
 
-        pthread_create(&plist->plays_thread, NULL, plays, plist);
+        pthread_create(&acpt->plist->plays_thread, NULL, plays, acpt->plist);
         
     }
+}
 
-    player *aux=plist;
+int main(int argc, char * argv[]){
+
+
+    /*guardar fd de players(depois lista quiçá)*/	
+    int pfd, nsec=0;
+    //player *plist;
+
+
+    /*verificação argumentos de entrada para dim*/
+    if(argc<2){
+        printf("Incorrect arguments!\n");
+        exit(-1);
+    }
+    int dim=atoi(argv[1]);
+    printf("%d\n", dim);
+    
+    /*init board*/
+    init_board(dim);
+    
+    acceptstruct *pass = malloc(sizeof(acceptstruct));
+    pass->plist=NULL;
+    pass->dim=dim;
+
+    pthread_t lst_thread;
+    /*create thread to accept new connections*/
+    pthread_create(&lst_thread, NULL, accept_thread, pass);
+    
+    while(!done){
+        
+    }
+    
+    pthread_kill(lst_thread, SIGUSR1);
+    pthread_join(lst_thread, NULL);
+
+    printf("saiu main\n");
+    player *aux=pass->plist;
     while(aux!=NULL){
         free(aux->resp);
-        removefirst(&plist);
-        aux=plist;
+        removefirst(&pass->plist);
+        aux=pass->plist;
     }
 
+    done=0;
     return 0;
 
 }

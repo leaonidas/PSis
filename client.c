@@ -11,7 +11,7 @@
 
 #define PORT 3000
 
-
+int done=0;
 
 
 void *listenserver(void *pass){
@@ -21,7 +21,6 @@ void *listenserver(void *pass){
     
     int sfd=*(int*) pass;
     
-    int done=0;
     play_response resp;
     while(!done){
         /*receives play response*/
@@ -70,7 +69,7 @@ int main(int argc, char * argv[]){
     
     /*init events*/
     SDL_Event event;
-    int done=0;
+
     if( SDL_Init( SDL_INIT_VIDEO ) < 0 ) {
         printf( "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         exit(-1);
