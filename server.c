@@ -93,8 +93,8 @@ void *plays(void *pass){
             done=1;
             printf("done= %d\n", done);
             printf("saiu thread\n");
-            free(alarmptr);
-            pthread_exit(pthread_self());
+            //free(alarmptr);
+            //pthread_exit(pthread_self());
 
         }
     }
@@ -171,14 +171,27 @@ int main(int argc, char * argv[]){
     /*create thread to accept new connections*/
     pthread_create(&lst_thread, NULL, accept_thread, pass);
     
-    while(!done){
+    while(1){
+        while(!done){
         
+        }
+        sleep(10);
+        init_board(dim);
+        done=0;
+        player *aux=pass->plist;
+        while(aux!=NULL){
+            aux->score=0;
+            aux=aux->next;
+        }
     }
     
+
+                            /******SAÍDA DO PROGRAMA!******/
     pthread_kill(lst_thread, SIGUSR1);
     pthread_join(lst_thread, NULL);
 
     printf("saiu main\n");
+    /*Frees allocated memory*/
     player *aux=pass->plist;
     while(aux!=NULL){
         free(aux->resp);

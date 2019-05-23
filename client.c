@@ -57,7 +57,8 @@ void *listenserver(void *pass){
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 0, 0);
         }
     }
-    return 0;
+    //return 0;
+    pthread_exit(pthread_self());
 }
 
 
@@ -65,7 +66,7 @@ void *listenserver(void *pass){
 
 int main(int argc, char * argv[]){
     
-    int dim;
+    int dim, close=0;
     
     /*init events*/
     SDL_Event event;
@@ -119,30 +120,37 @@ int main(int argc, char * argv[]){
     int *pass;
     pass=malloc(sizeof(int));
     *pass=sfd;
-    pthread_create(&lst_thread, NULL, listenserver, pass);
+    //pthread_create(&lst_thread, NULL, listenserver, pass);
     
-    while(!done){
-        while(SDL_PollEvent(&event)){
-            switch(event.type){
-                case SDL_QUIT: {
-                    done=SDL_TRUE;
-                    break;
+    while(!close){
+        pthread_create(&lst_thread, NULL, listenserver, pass);
+        while(!done){
+            while(SDL_PollEvent(&event)){
+                switch(event.type){
+                    case SDL_QUIT: {
+                        done=SDL_TRUE;
+                        close=SDL_TRUE;
+                        break;
+                    }
+                    case SDL_MOUSEBUTTONDOWN:{
+                        /*gets the x and y from button and sends to server*/
+                        int board_x, board_y;
+                        get_board_card(event.button.x, event.button.y, &board_x, &board_y);
+                        write(sfd, &board_x, sizeof(board_x));
+                        write(sfd, &board_y, sizeof(board_y));
+                    }
                 }
-                case SDL_MOUSEBUTTONDOWN:{
-                    /*gets the x and y from button and sends to server*/
-                    int board_x, board_y;
-                    get_board_card(event.button.x, event.button.y, &board_x, &board_y);
-                    write(sfd, &board_x, sizeof(board_x));
-                    write(sfd, &board_y, sizeof(board_y));
-                }
-            }
-        } 
+            } 
+        }
+
+        int score;
+        read(sfd, &score, sizeof(score));
+        printf("WINNER SCORE: %d\n", score);
+        done=0;
+        close_board_windows();
+        sleep(10);
+        create_board_window(300, 300, dim);
     }
-    
-    
-    int score;
-    read(sfd, &score, sizeof(score));
-    printf("WINNER SCORE: %d\n", score);
     
     printf("fim\n");
     close_board_windows();
