@@ -58,7 +58,7 @@ void *listenserver(void *pass){
         }
     }
     //return 0;
-    pthread_exit(pthread_self());
+    pthread_exit(NULL);
 }
 
 

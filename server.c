@@ -36,12 +36,13 @@ void *listenalarm(void *pass){
     while(1){
         if(time(NULL)-before>=WAITSP){
             printf("ENTROU\n");
+            int tid = pthread_self();
             alarmptr->resp->code=-1;
             write(alarmptr->pfd, alarmptr->resp, sizeof(*alarmptr->resp));
             alarmptr->resp->play1[0]=-1;
             *(alarmptr->bip)=0;
             changeplay(-1);
-            pthread_exit(pthread_self());
+            pthread_exit(NULL);
         }
     }
     return 0;
