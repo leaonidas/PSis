@@ -24,9 +24,18 @@ typedef struct player{
 typedef struct acceptstruct{
     player *plist;
     int dim;
+    struct colour *c;
 }acceptstruct;
+
+typedef struct colour{
+    int r;
+    int g;
+    int b;
+}colour;
 
 void addplayer(player **plist, int fd);
 void removeplayer(player **plist, int fd);
 void removefirst(player **plist);
 void printlist(player *plist);
+void colourvector(colour *c);
+void initcolour(player **plist, colour *clist, int i);

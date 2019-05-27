@@ -20,32 +20,38 @@ void *listenserver(void *pass){
     int sfd=*sfdpointer;*/
     
     int sfd=*(int*) pass;
+    int r, g, b;
+    char plays[10];
+    plays[0]='\0';
     
     play_response resp;
     while(!done){
         /*receives play response*/
         
         read(sfd, &resp, sizeof(resp));
+        read(sfd, plays, sizeof(plays));
+        sscanf(plays, "%d %d %d\n", &r, &g, &b);
+        printf("r: %d g: %d b: %d\n", r, g, b);
         printf("code in resp: %d\n", resp.code);
-                    
+
         /*switch case response code*/
         switch (resp.code) {
             case 1:
-                paint_card(resp.play1[0], resp.play1[1] , 7, 200, 100);
+                paint_card(resp.play1[0], resp.play1[1] , r, g, b);
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 200, 200, 200);
                 break;
             case 3:
                 done = 1;
             case 2:
-                paint_card(resp.play1[0], resp.play1[1] , 107, 200, 100);
+                paint_card(resp.play1[0], resp.play1[1] , r, g, b);
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 0, 0, 0);
-                paint_card(resp.play2[0], resp.play2[1] , 107, 200, 100);
+                paint_card(resp.play2[0], resp.play2[1] , r, g, b);
                 write_card(resp.play2[0], resp.play2[1], resp.str_play2, 0, 0, 0);
                 break;
             case -2:
-                paint_card(resp.play1[0], resp.play1[1] , 107, 200, 100);
+                paint_card(resp.play1[0], resp.play1[1] , r, g, b);
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 0, 0);
-                paint_card(resp.play2[0], resp.play2[1] , 107, 200, 100);
+                paint_card(resp.play2[0], resp.play2[1] , r, g, b);
                 write_card(resp.play2[0], resp.play2[1], resp.str_play2, 255, 0, 0);
                 sleep(2);
                 paint_card(resp.play1[0], resp.play1[1], 255, 255, 255);
@@ -54,7 +60,7 @@ void *listenserver(void *pass){
             case -1:
                 /*case 2nd card is not pick after 5 seconds*/
                 paint_card(resp.play1[0], resp.play1[1], 255, 255, 255);
-                write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 0, 0);
+                write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 255, 255);
         }
     }
     //return 0;

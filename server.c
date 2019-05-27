@@ -32,13 +32,15 @@ void *listenalarm(void *pass){
     struct alarmstruct *alarmptr = (struct alarmstruct *) pass;
     
     time_t before=time(NULL);
+    char send[8];
+    sprintf(send, "%d %d %d\n", 0, 0, 0);
 
     while(1){
         if(time(NULL)-before>=WAITSP){
             printf("ENTROU\n");
-            int tid = pthread_self();
             alarmptr->resp->code=-1;
             write(alarmptr->pfd, alarmptr->resp, sizeof(*alarmptr->resp));
+            write(alarmptr->pfd, send, sizeof(send));
             alarmptr->resp->play1[0]=-1;
             *(alarmptr->bip)=0;
             changeplay(-1);
@@ -55,6 +57,8 @@ void *plays(void *pass){
 
     int board_x, board_y;
     int bip=0;
+    char colour[8];
+    colour[0]='\0';
 
     pthread_t alarm_thread;
     alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
@@ -68,12 +72,19 @@ void *plays(void *pass){
         printf("board_x= %d\n", board_x);
         printf("board_y= %d\n", board_y);
         printf("resp play depois de 5 sec %d\n", p->resp->play1[0]);
-        
+
+
         *(p->resp)=board_play(board_x, board_y);
+
         if(p->resp->code==2) p->score++;
+
         printf("resp play depois de board play %d\n", p->resp->play1[0]);
         printf("responde code: %d\n", p->resp->code);
+        sprintf(colour, "%d %d %d\n", p->r, p->g, p->b);
+        printf("%s\n", colour);
         write(p->pfd, p->resp, sizeof(*(p->resp)));
+        write(p->pfd, colour, sizeof(colour));
+       	
         
         if(p->resp->code==1){
             alarmptr->resp=p->resp;
@@ -94,6 +105,7 @@ void *plays(void *pass){
             done=1;
             printf("done= %d\n", done);
             printf("saiu thread\n");
+            write(p->pfd, colour, sizeof(colour));
             //free(alarmptr);
             //pthread_exit(pthread_self());
 
@@ -105,7 +117,7 @@ void *plays(void *pass){
 void *accept_thread(void *pass){
     
     struct acceptstruct *acpt = (struct acceptstruct *) pass;
-    int pfd;
+    int pfd, i=0;
     
     /*criar socket de listen*/
     struct sockaddr_in local_addr;
@@ -135,7 +147,9 @@ void *accept_thread(void *pass){
     
         /*adds player one to the list*/
         addplayer(&(acpt->plist), pfd);
+        initcolour(&(acpt->plist), acpt->c, i);
         printlist(acpt->plist);
+        i++;
 
         /*send dim*/
         write(pfd, &acpt->dim, sizeof(acpt->dim));
@@ -150,6 +164,7 @@ int main(int argc, char * argv[]){
 
     /*guardar fd de players(depois lista quiçá)*/	
     int pfd, nsec=0;
+    struct colour c[5];
     //player *plist;
 
 
@@ -160,6 +175,12 @@ int main(int argc, char * argv[]){
     }
     int dim=atoi(argv[1]);
     printf("%d\n", dim);
+
+    /*fills the vector with colours to be assigned to each player*/
+    colourvector(c);
+    for(int i=0; i<5; i++){
+    	printf("r: %d g: %d b: %d\n", c[i].r, c[i].g, c[i].b);
+    }
     
     /*init board*/
     init_board(dim);
@@ -167,6 +188,7 @@ int main(int argc, char * argv[]){
     acceptstruct *pass = malloc(sizeof(acceptstruct));
     pass->plist=NULL;
     pass->dim=dim;
+    pass->c=c;
 
     pthread_t lst_thread;
     /*create thread to accept new connections*/
