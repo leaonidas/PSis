@@ -1,9 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-//#include "server_library.h"
 
-//#include "board_library.h"
 #include "list.h"
 #include "UI_library.h"
 #include <unistd.h>
@@ -15,8 +13,6 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <pthread.h>
-//#include "list.h"
-
 
 
 #define PORT 3000
@@ -28,13 +24,13 @@ static void handler(int signum){
     pthread_exit(NULL);
 }
 
-void *listenalarm(void *pass){
-    struct alarmstruct *alarmptr = (struct alarmstruct *) pass;
+void *listenalarm(void *alrm){
+    struct alarmstruct *alarmptr = (struct alarmstruct *) alrm;
     
     time_t before=time(NULL);
     char send[8];
     sprintf(send, "%d %d %d\n", 0, 0, 0);
-
+    printf("In alarm!\n");
     while(1){
         if(time(NULL)-before>=WAITSP){
             printf("ENTROU\n");
@@ -73,15 +69,16 @@ void *plays(void *pass){
         printf("board_y= %d\n", board_y);
         printf("resp play depois de 5 sec %d\n", p->resp->play1[0]);
 
-
         *(p->resp)=board_play(board_x, board_y);
 
-        if(p->resp->code==2) p->score++;
+        if(p->resp->code==2){
+        	(*p).score++;
+        	addcard(p, board_x, board_y, p->resp->str_play2);
+        }
 
         printf("resp play depois de board play %d\n", p->resp->play1[0]);
         printf("responde code: %d\n", p->resp->code);
         sprintf(colour, "%d %d %d\n", p->r, p->g, p->b);
-        printf("%s\n", colour);
         write(p->pfd, p->resp, sizeof(*(p->resp)));
         write(p->pfd, colour, sizeof(colour));
        	
@@ -90,6 +87,8 @@ void *plays(void *pass){
             alarmptr->resp=p->resp;
             alarmptr->pfd=p->pfd;
             alarmptr->bip=&bip;
+            addcard(p, board_x, board_y, p->resp->str_play1);
+            printf("After Adding card!\n");
             pthread_create(&alarm_thread, NULL, listenalarm, alarmptr);
             bip=1;
         }
@@ -97,10 +96,11 @@ void *plays(void *pass){
             printf("entrou alarm kill\n");
             pthread_kill(alarm_thread, SIGUSR1);
             pthread_join(alarm_thread, NULL);
+            removecard(p, -1);
             bip=0;
         }
         if(p->resp->code==3){
-            p->score++;
+            (*p).score++;
             write(p->pfd, &p->score, sizeof(p->score));
             done=1;
             printf("done= %d\n", done);
@@ -110,13 +110,17 @@ void *plays(void *pass){
             //pthread_exit(pthread_self());
 
         }
+
+        if(p->resp->code=-2){
+        	removecard(p, p->resp->code);
+        }
     }
 }
 
 
 void *accept_thread(void *pass){
     
-    struct acceptstruct *acpt = (struct acceptstruct *) pass;
+    int dim=*(int*) pass;
     int pfd, i=0;
     
     /*criar socket de listen*/
@@ -146,15 +150,18 @@ void *accept_thread(void *pass){
         printf("Player connected!\n");
     
         /*adds player one to the list*/
-        addplayer(&(acpt->plist), pfd);
-        initcolour(&(acpt->plist), acpt->c, i);
-        printlist(acpt->plist);
+        addplayer(pfd);
+        printf("Added player to list!\n");
+        initcolour(i);
+        printlist();
         i++;
 
         /*send dim*/
-        write(pfd, &acpt->dim, sizeof(acpt->dim));
+        write(pfd, &dim, sizeof(dim));
+        printf("Dim sent!\n");
+        sendstate(pfd);
 
-        pthread_create(&acpt->plist->plays_thread, NULL, plays, acpt->plist);
+        pthread_create(&getlist()->plays_thread, NULL, plays, getlist());
         
     }
 }
@@ -165,8 +172,6 @@ int main(int argc, char * argv[]){
     /*guardar fd de players(depois lista quiçá)*/	
     int pfd, nsec=0;
     struct colour c[5];
-    //player *plist;
-
 
     /*verificação argumentos de entrada para dim*/
     if(argc<2){
@@ -177,18 +182,14 @@ int main(int argc, char * argv[]){
     printf("%d\n", dim);
 
     /*fills the vector with colours to be assigned to each player*/
-    colourvector(c);
-    for(int i=0; i<5; i++){
-    	printf("r: %d g: %d b: %d\n", c[i].r, c[i].g, c[i].b);
-    }
+    colourvector();
     
     /*init board*/
     init_board(dim);
-    
-    acceptstruct *pass = malloc(sizeof(acceptstruct));
-    pass->plist=NULL;
-    pass->dim=dim;
-    pass->c=c;
+
+    int *pass;
+    pass=malloc(sizeof(int));
+    *pass=dim;
 
     pthread_t lst_thread;
     /*create thread to accept new connections*/
@@ -201,26 +202,16 @@ int main(int argc, char * argv[]){
         sleep(10);
         init_board(dim);
         done=0;
-        player *aux=pass->plist;
-        while(aux!=NULL){
-            aux->score=0;
-            aux=aux->next;
-        }
+        setscore();
     }
-    
+
 
                             /******SAÍDA DO PROGRAMA!******/
     pthread_kill(lst_thread, SIGUSR1);
     pthread_join(lst_thread, NULL);
 
     printf("saiu main\n");
-    /*Frees allocated memory*/
-    player *aux=pass->plist;
-    while(aux!=NULL){
-        free(aux->resp);
-        removefirst(&pass->plist);
-        aux=pass->plist;
-    }
+    freeplist();
 
     done=0;
     return 0;

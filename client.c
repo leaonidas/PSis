@@ -1,13 +1,15 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
-#include "board_library.h"
+//#include "board_library.h"
+#include "list.h"
 #include "UI_library.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+
 
 #define PORT 3000
 
@@ -72,7 +74,7 @@ void *listenserver(void *pass){
 
 int main(int argc, char * argv[]){
     
-    int dim, close=0;
+    int dim, close=0,r;
     
     /*init events*/
     SDL_Event event;
@@ -118,6 +120,8 @@ int main(int argc, char * argv[]){
     printf("dim= %d\n", dim);
     
     create_board_window(300, 300, dim);
+
+    r=fillboard(sfd);
 
     pthread_t lst_thread;
     

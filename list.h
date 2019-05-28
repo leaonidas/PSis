@@ -10,6 +10,13 @@ typedef struct alarmstruct{
     int *bip;
 }alarmstruct;
 
+typedef struct card{
+    int x;
+    int y;
+    char v[3];
+    struct card *next;
+}card;
+
 typedef struct player{
 	pthread_t plays_thread;
     int pfd;
@@ -18,14 +25,9 @@ typedef struct player{
     int b;
     play_response *resp;
     int score;
+    card *clist;
     struct player *next;
 } player;
-
-typedef struct acceptstruct{
-    player *plist;
-    int dim;
-    struct colour *c;
-}acceptstruct;
 
 typedef struct colour{
     int r;
@@ -33,9 +35,25 @@ typedef struct colour{
     int b;
 }colour;
 
-void addplayer(player **plist, int fd);
-void removeplayer(player **plist, int fd);
-void removefirst(player **plist);
-void printlist(player *plist);
-void colourvector(colour *c);
-void initcolour(player **plist, colour *clist, int i);
+/*typedef struct card{
+    int x;
+    int y;
+    char v[3];
+    struct card *next;
+}card;*/
+
+player * getlist();
+void addcard (player *p, int x, int y, char v[3]);
+void removecard(player *p, int nremove);
+void sendstate(int pfd);
+int fillboard(int sfd);
+
+
+void addplayer(int fd);
+void removeplayer(int fd);
+void removefirst();
+void setscore();
+void freeplist();
+void printlist();
+void colourvector();
+void initcolour(int i);
