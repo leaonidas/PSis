@@ -35,8 +35,8 @@ void *listenalarm(void *alrm){
         if(time(NULL)-before>=WAITSP){
             printf("ENTROU\n");
             alarmptr->resp->code=-1;
-            write(alarmptr->pfd, alarmptr->resp, sizeof(*alarmptr->resp));
-            write(alarmptr->pfd, send, sizeof(send));
+            sendall(alarmptr->resp, send);
+            removecard(getlist(), -1);
             alarmptr->resp->play1[0]=-1;
             *(alarmptr->bip)=0;
             changeplay(-1);
@@ -51,6 +51,8 @@ void *plays(void *pass){
 
     signal(SIGUSR1, handler);
 
+    player *aux;
+
     int board_x, board_y;
     int bip=0;
     char colour[8];
@@ -60,7 +62,7 @@ void *plays(void *pass){
     alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
 
     while(1){
-
+    	printf("Ainda chegou aqui!\n");
         read(p->pfd, &board_x, sizeof(board_x));
         read(p->pfd, &board_y, sizeof(board_y));
         
@@ -79,16 +81,15 @@ void *plays(void *pass){
         printf("resp play depois de board play %d\n", p->resp->play1[0]);
         printf("responde code: %d\n", p->resp->code);
         sprintf(colour, "%d %d %d\n", p->r, p->g, p->b);
-        write(p->pfd, p->resp, sizeof(*(p->resp)));
-        write(p->pfd, colour, sizeof(colour));
+        sendall(p->resp, colour);
        	
         
         if(p->resp->code==1){
+        	addcard(p, board_x, board_y, p->resp->str_play1);
             alarmptr->resp=p->resp;
             alarmptr->pfd=p->pfd;
             alarmptr->bip=&bip;
-            addcard(p, board_x, board_y, p->resp->str_play1);
-            printf("After Adding card!\n");
+            //alarmptr->c=p->clist;
             pthread_create(&alarm_thread, NULL, listenalarm, alarmptr);
             bip=1;
         }
@@ -96,23 +97,27 @@ void *plays(void *pass){
             printf("entrou alarm kill\n");
             pthread_kill(alarm_thread, SIGUSR1);
             pthread_join(alarm_thread, NULL);
-            removecard(p, -1);
+            //removecard(p, -1);
             bip=0;
         }
         if(p->resp->code==3){
             (*p).score++;
-            write(p->pfd, &p->score, sizeof(p->score));
+            aux=getlist();
+            while(aux!=NULL){
+            	write(aux->pfd, &aux->score, sizeof(p->score));
+            	aux=aux->next;
+            }
             done=1;
             printf("done= %d\n", done);
             printf("saiu thread\n");
-            write(p->pfd, colour, sizeof(colour));
+            //write(p->pfd, colour, sizeof(colour));
             //free(alarmptr);
             //pthread_exit(pthread_self());
 
         }
 
-        if(p->resp->code=-2){
-        	removecard(p, p->resp->code);
+        if(p->resp->code==-2){
+        	removecard(p, -1);
         }
     }
 }
@@ -122,6 +127,7 @@ void *accept_thread(void *pass){
     
     int dim=*(int*) pass;
     int pfd, i=0;
+    player *viewcards;
     
     /*criar socket de listen*/
     struct sockaddr_in local_addr;
@@ -144,7 +150,8 @@ void *accept_thread(void *pass){
     listen(lst_fd, 5);
     
     while(1){
-        
+        viewcards=getlist();
+
         /*add player*/
         pfd=accept(lst_fd, NULL, NULL);
         printf("Player connected!\n");
@@ -159,6 +166,10 @@ void *accept_thread(void *pass){
         /*send dim*/
         write(pfd, &dim, sizeof(dim));
         printf("Dim sent!\n");
+
+        
+
+
         sendstate(pfd);
 
         pthread_create(&getlist()->plays_thread, NULL, plays, getlist());

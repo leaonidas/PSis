@@ -15,6 +15,45 @@
 
 int done=0;
 
+int fillboard(int sfd){
+    int x, y, r, g, b;
+    int i=0;
+    char vaux[3], colour[8];
+    card rcvcard;
+
+
+    read(sfd, &i, sizeof(i));
+    if(i>1){
+        read(sfd, colour, sizeof(colour));
+        sscanf(colour, "%d %d %d\n", &r, &g, &b);
+        printf("Colour received: %d %d %d\n", r, g, b);
+    }
+    
+
+    while(1){
+        read(sfd, &rcvcard, sizeof(rcvcard));
+        printf("x: %d  y: %d  vaux: %s\n", rcvcard.x, rcvcard.y, rcvcard.v);
+        x=rcvcard.x;
+        y=rcvcard.y;
+        strcpy(vaux, rcvcard.v);
+        printf("vaux:  %s\n", vaux);
+
+        /*reaches the end of all cards*/
+        if(x==-1 && y==-1){
+            return 1;
+        }
+        /*reaches the end of cards belonging to one player
+        exits to change colour*/
+        if(x==-2 && y==-2){
+            read(sfd, colour, sizeof(colour));
+            sscanf(colour, "%d %d %d\n", &r, &g, &b);
+        }else{
+            paint_card(x, y, r, g, b);
+            write_card(x, y, vaux, 0, 0, 0);
+        }
+    }
+}
+
 
 void *listenserver(void *pass){
     
@@ -23,7 +62,7 @@ void *listenserver(void *pass){
     
     int sfd=*(int*) pass;
     int r, g, b;
-    char plays[10];
+    char plays[8];
     plays[0]='\0';
     
     play_response resp;
@@ -43,6 +82,7 @@ void *listenserver(void *pass){
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 200, 200, 200);
                 break;
             case 3:
+                printf("Closing the game!\n");
                 done = 1;
             case 2:
                 paint_card(resp.play1[0], resp.play1[1] , r, g, b);
@@ -74,7 +114,7 @@ void *listenserver(void *pass){
 
 int main(int argc, char * argv[]){
     
-    int dim, close=0,r;
+    int dim, close=0, r, score;
     
     /*init events*/
     SDL_Event event;
@@ -153,9 +193,9 @@ int main(int argc, char * argv[]){
             } 
         }
 
-        int score;
         read(sfd, &score, sizeof(score));
-        printf("WINNER SCORE: %d\n", score);
+        if(score!=0) printf("WINNER SCORE: %d\n", score);
+        else printf("GAME OVER!\n");
         done=0;
         close_board_windows();
         sleep(10);

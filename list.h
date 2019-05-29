@@ -4,18 +4,20 @@
 #include <pthread.h>
 #include "board_library.h"
 
-typedef struct alarmstruct{
-    play_response *resp;
-    int pfd;
-    int *bip;
-}alarmstruct;
-
 typedef struct card{
     int x;
     int y;
     char v[3];
     struct card *next;
 }card;
+
+
+typedef struct alarmstruct{
+    play_response *resp;
+    //card *c;
+    int pfd;
+    int *bip;
+}alarmstruct;
 
 typedef struct player{
 	pthread_t plays_thread;
@@ -46,7 +48,8 @@ player * getlist();
 void addcard (player *p, int x, int y, char v[3]);
 void removecard(player *p, int nremove);
 void sendstate(int pfd);
-int fillboard(int sfd);
+void sendall(play_response *resp, char *colour);
+//int fillboard(int sfd);
 
 
 void addplayer(int fd);
