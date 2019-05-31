@@ -35,9 +35,8 @@ void addcard (player *p, int x, int y, char v[3]){
 /*nremove is the code corresponding to the play it can either be -1 or -2*/
 void removecard(player *p, int nremove){
     int i = 0;
-    nremove = nremove*(-1);
     printf("Inside removecard!\n");
-    printf("nremove: %d\n", nremove);
+    printf("pfd: %d\n", p->pfd);
     card *remove;
 
     /*while(p->clist!=NULL){
@@ -58,8 +57,8 @@ void removecard(player *p, int nremove){
 
 void sendstate(int pfd){
     player *aux = plist;
-    char colour[8];
-    colour[0]='\0';
+    card *auxcl=plist->clist;
+    card change;
     int i=0;
 
     printf("Inside sendstate!\n\n");
@@ -73,15 +72,16 @@ void sendstate(int pfd){
 
     /*Sends the colour of next player's cards*/
     if(aux->next!=NULL){
-        sprintf(colour, "%d %d %d\n", aux->next->r, aux->next->g, aux->next->b);
-        printf("Next player card colour: %d %d %d\n\n", aux->next->r, aux->next->g, aux->next->b);
-        write(pfd, colour, sizeof(colour));
+        //sprintf(colour, "%d %d %d\n", aux->next->r, aux->next->g, aux->next->b);
+        //printf("Next player card colour: %d %d %d\n\n", aux->next->r, aux->next->g, aux->next->b);
+        //write(pfd, colour, sizeof(colour));
+        sendcolour(aux->next->r, aux->next->g, aux->next->b, pfd);
     }
 
-    while(aux->clist!=NULL){
+    /*while(aux->clist!=NULL){
         printf("card x: %d   card y: %d\n", aux->clist->x, aux->clist->y);
         aux->clist=aux->clist->next;
-    }
+    }*/
             
     
 
@@ -92,29 +92,32 @@ void sendstate(int pfd){
         if(aux->pfd!=pfd){
         /*cycles through cards until it reaches the last one
         and sends the corresponding data*/
-            while(aux->clist!=NULL){
-                printf("Sending this card: %d %d\n", aux->clist->x, aux->clist->y);
-                write(pfd, aux->clist, sizeof(*(aux->clist)));
-                aux->clist=aux->clist->next;
+            while(auxcl!=NULL){
+                printf("Sending this card: %d %d\n", auxcl->x, auxcl->y);
+                write(pfd, auxcl, sizeof(*(auxcl)));
+                auxcl=auxcl->next;
             }
             /*when it reaches the last card has to warn the client
             that the colour will be changed*/
-            if(aux->clist==NULL){
-                if(aux->clist!=NULL){
-                    card *change = (card*)malloc(sizeof(card));
-                    change->x=-2;
-                    change->y=-2;
-                    change->v[0]='\0';
+            if(auxcl==NULL){
+                if(aux->next!=NULL){
+                    //card *change = (card*)malloc(sizeof(card));
+                    change.x=-2;
+                    change.y=-2;
+                    change.v[0]='\0';
                     printf("Sending card to change colour!\n");
-                    write(pfd, change, sizeof(change));
-                    free(change);
-                    sprintf(colour, "%d %d %d\n", aux->next->r, aux->next->g, aux->next->b);
-                    write(pfd, colour, sizeof(colour));
+                    write(pfd, &change, sizeof(change));
+                    //colour[0]='\0';
+                    //sprintf(colour, "%d %d %d\n", aux->next->r, aux->next->g, aux->next->b);
+                    //write(pfd, colour, sizeof(colour));
+                    sendcolour(aux->next->r, aux->next->g, aux->next->b, pfd);
                 }
             }
         }
 
         aux=aux->next;
+        if (aux!=NULL) auxcl=aux->clist;
+
     }
     printf("Exit while!\n");
     /*when it reaches the end of cards to send warns the
@@ -132,16 +135,26 @@ void sendstate(int pfd){
 
 }
 
-void sendall(play_response *resp, char *colour){
+void sendall(play_response *resp, player *p){
     player *aux=plist;
 
     while(aux!=NULL){
+        //printf("Colour inside sendall: %s\n", colour);
         write(aux->pfd, resp, sizeof(*resp));
-        write(aux->pfd, colour, sizeof(colour));
+        //write(aux->pfd, colour, sizeof(colour));
+        sendcolour(p->r, p->g, p->b, aux->pfd);
         aux=aux->next;
     }
 
 }
+
+void sendcolour(int r, int g, int b, int pfd){
+    printf("Inside sendcolour: %d %d %d\n", r, g, b);
+    write(pfd, &r, sizeof(int));
+    write(pfd, &g, sizeof(int));
+    write(pfd, &b, sizeof(int));
+}
+
 
 void addplayer(int pfd){
     player *new=(player *)malloc(sizeof(player));
@@ -150,9 +163,21 @@ void addplayer(int pfd){
     new->next=plist;
     new->score=0;
     new->resp=malloc(sizeof(new->resp));
+    new->resp->play1[0]=-1;
     new->clist=NULL;
     plist=new;
     return;
+}
+
+int countlist(){
+    player *aux=plist;
+    int count=0;
+
+    while(aux!=NULL){
+        count++;
+        aux=aux->next;
+    }
+    return count;
 }
 
 void removebyfd(int pfd){
@@ -161,6 +186,7 @@ void removebyfd(int pfd){
     if(plist->next==NULL){
         if(plist->pfd==pfd)
             free(plist);
+            plist=NULL;
     }
     else{
         if(plist->pfd==pfd){
@@ -194,7 +220,7 @@ void printlist(){
     int i=0;
     
     while(aux!=NULL){
-        printf("Player %d fd is: %d\n",i, aux->pfd);
+        printf("Player %d fd is: %d\nPlayer score is: %d\n",i, aux->pfd, aux->score);
         printf("Red: %d Green: %d Blue: %d\n", aux->r, aux->g, aux->b);
         i++;
         aux=aux->next;
@@ -208,6 +234,24 @@ void setscore(){
         aux->score=0;
         aux=aux->next;
     }
+}
+
+int verifywinner(){
+
+    int wfd=0, maxscore=0;
+    player *aux=plist;
+
+    while(aux!=NULL){
+        printf("Max score player is: %d\nPlayer %d score is: %d\n", aux->pfd, aux->pfd, aux->score);
+        if(aux->score > maxscore){
+            maxscore = aux->score;
+            wfd=aux->pfd;
+        }
+        aux=aux->next;
+    }
+
+    return wfd;
+
 }
 
 void freeplist(){

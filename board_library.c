@@ -63,36 +63,36 @@ void init_board(int dim){
 
 /*receives a card's coordinates and depending of its satus
 updates and returns suitable information*/
-play_response board_play(int x, int y){
-  play_response resp;
-  resp.code =10;
+void board_play(int x, int y, play_response *resp){
+  //play_response resp;
+  resp->code =10;
   if(strcmp(get_board_place_str(x, y), "")==0){
     printf("FILLED\n");
-    resp.code =0;
+    resp->code =0;
   }else{
-    if(play1[0]== -1){
+    if(resp->play1[0]== -1){
         printf("FIRST\n");
-        resp.code =1;
+        resp->code =1;
 
-        play1[0]=x;
-        play1[1]=y;
-        resp.play1[0]= play1[0];
-        resp.play1[1]= play1[1];
-        strcpy(resp.str_play1, get_board_place_str(x, y));
+        //play1[0]=x;
+        //play1[1]=y;
+        resp->play1[0]= x;//play1[0];
+        resp->play1[1]= y;//play1[1];
+        strcpy(resp->str_play1, get_board_place_str(x, y));
       }else{
-        char * first_str = get_board_place_str(play1[0], play1[1]);
+        char * first_str = get_board_place_str(resp->play1[0], resp->play1[1]);
         char * secnd_str = get_board_place_str(x, y);
 
-        if ((play1[0]==x) && (play1[1]==y)){
-          resp.code =0;
+        if ((resp->play1[0]==x) && (resp->play1[1]==y)){
+          resp->code =0;
           printf("FILLED\n");
         } else{
-          resp.play1[0]= play1[0];
-          resp.play1[1]= play1[1];
-          strcpy(resp.str_play1, first_str);
-          resp.play2[0]= x;
-          resp.play2[1]= y;
-          strcpy(resp.str_play2, secnd_str);
+          //resp.play1[0]= play1[0];
+          //resp.play1[1]= play1[1];
+          strcpy(resp->str_play1, first_str);
+          resp->play2[0]= x;
+          resp->play2[1]= y;
+          strcpy(resp->str_play2, secnd_str);
 
           if (strcmp(first_str, secnd_str) == 0){
             printf("CORRECT!!!\n");
@@ -103,19 +103,19 @@ play_response board_play(int x, int y){
 
             n_corrects +=2;
             if (n_corrects == dim_board* dim_board)
-                resp.code =3;
+                resp->code =3;
             else
-              resp.code =2;
+              resp->code =2;
           }else{
             printf("INCORRECT");
 
-            resp.code = -2;
+            resp->code = -2;
           }
-          play1[0]= -1;
+          //resp->play1[0]= -1;
         }
       }
     }
-  return resp;
+  return;
 }
 
 void changeplay(int x){

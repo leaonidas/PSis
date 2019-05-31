@@ -18,75 +18,110 @@
 #define PORT 3000
 #define WAITSP 5
 
-int done=0;
+int done=0, bye=0;
 
+void *accept_thread(void *pass);
+
+/*signal to exit thread*/
 static void handler(int signum){
     pthread_exit(NULL);
 }
 
+/*thread to count the time between the first and secound picks
+if player picks the secound card before the 5 second this thread is send a signal to exit by handler
+if player doesnt pick a card in the 5 seconds that card is removed from the boards*/
 void *listenalarm(void *alrm){
     struct alarmstruct *alarmptr = (struct alarmstruct *) alrm;
     
     time_t before=time(NULL);
-    char send[8];
-    sprintf(send, "%d %d %d\n", 0, 0, 0);
-    printf("In alarm!\n");
+
     while(1){
         if(time(NULL)-before>=WAITSP){
-            printf("ENTROU\n");
-            alarmptr->resp->code=-1;
-            sendall(alarmptr->resp, send);
-            removecard(getlist(), -1);
-            alarmptr->resp->play1[0]=-1;
-            *(alarmptr->bip)=0;
+        	/*sends card removal to all players and removes card from the list*/
+            sendall(alarmptr->p->resp, alarmptr->p);
+            removecard(alarmptr->p, 1);
+            /*change value of code and first card*/
+            alarmptr->p->resp->code=-1;
+            alarmptr->p->resp->play1[0]=-1;
             changeplay(-1);
+
+            *(alarmptr->bip)=0;
+
             pthread_exit(NULL);
         }
     }
     return 0;
 }
 
+
+/*thread that deals with the communications of one player*/
 void *plays(void *pass){
     struct player *p = (struct player *) pass;
+    struct play_response resp;
+
+    printf("pfd: %d\n", p->pfd);
 
     signal(SIGUSR1, handler);
-
+    int bip=0;
     player *aux;
 
-    int board_x, board_y;
-    int bip=0;
-    char colour[8];
-    colour[0]='\0';
+    int board_x, board_y, wfd, n, m, numpl;
+
 
     pthread_t alarm_thread;
     alarmstruct *alarmptr=malloc(sizeof(struct alarmstruct));
 
     while(1){
+
+    	/*while(countlist()<=1){
+    		sleep(1);
+    	}*/
+
     	printf("Ainda chegou aqui!\n");
-        read(p->pfd, &board_x, sizeof(board_x));
-        read(p->pfd, &board_y, sizeof(board_y));
+        n=read(p->pfd, &board_x, sizeof(board_x));
+        m=read(p->pfd, &board_y, sizeof(board_y));
+
+        if(n==-1 || m==-1 || n==0 || m==0){
+        	printf("Someone left the game!\n");
+        	removebyfd(p->pfd);
+        	numpl=countlist();
+        			
+        	if(numpl==0) {
+        		done=1;
+        		bye=1;
+        	}
+        	else if(numpl==1){
+        		resp.code=-4;
+        		write(getlist()->pfd, &resp, sizeof(resp));
+        	}
+        	free(alarmptr);
+        	pthread_exit(NULL);
+
+        }
         
         printf("BIP: %d\n", bip);
         printf("board_x= %d\n", board_x);
         printf("board_y= %d\n", board_y);
         printf("resp play depois de 5 sec %d\n", p->resp->play1[0]);
 
-        *(p->resp)=board_play(board_x, board_y);
+        board_play(board_x, board_y, p->resp);
+
+        sendall(p->resp, p);
 
         if(p->resp->code==2){
         	(*p).score++;
+        	p->resp->play1[0]=-1;
         	addcard(p, board_x, board_y, p->resp->str_play2);
         }
 
         printf("resp play depois de board play %d\n", p->resp->play1[0]);
         printf("responde code: %d\n", p->resp->code);
-        sprintf(colour, "%d %d %d\n", p->r, p->g, p->b);
-        sendall(p->resp, colour);
+
        	
         
         if(p->resp->code==1){
         	addcard(p, board_x, board_y, p->resp->str_play1);
-            alarmptr->resp=p->resp;
+            alarmptr->p=p;
             alarmptr->pfd=p->pfd;
             alarmptr->bip=&bip;
             //alarmptr->c=p->clist;
@@ -103,32 +138,47 @@ void *plays(void *pass){
         if(p->resp->code==3){
             (*p).score++;
             aux=getlist();
+            printf("Game finish!\n\n");
+            printf("\n");
+
+            /*verifies winner and sends messages to all players*/
+            wfd=verifywinner();
             while(aux!=NULL){
-            	write(aux->pfd, &aux->score, sizeof(p->score));
+            	if(aux->pfd==wfd) write(aux->pfd, &aux->score, sizeof(p->score));
+            	else{
+            		aux->score=0;
+            		write(aux->pfd, &aux->score, sizeof(p->score));
+            	}
+            	aux=aux->next;
+            }
+            /*removes all cards from the list*/
+            aux=getlist();
+            while(aux!=NULL){
+            	while(aux->clist!=NULL){
+            		removecard(aux, 1);
+            	}
             	aux=aux->next;
             }
             done=1;
             printf("done= %d\n", done);
             printf("saiu thread\n");
-            //write(p->pfd, colour, sizeof(colour));
-            //free(alarmptr);
-            //pthread_exit(pthread_self());
-
         }
 
         if(p->resp->code==-2){
-        	removecard(p, -1);
+        	removecard(p, 1);
+        	p->resp->play1[0]=-1;
         }
     }
 }
 
-
+/*socket to accept players connections*/
 void *accept_thread(void *pass){
     
     int dim=*(int*) pass;
     int pfd, i=0;
-    player *viewcards;
-    
+    play_response resp;
+    resp.code=-4;
+
     /*criar socket de listen*/
     struct sockaddr_in local_addr;
     int lst_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -150,7 +200,6 @@ void *accept_thread(void *pass){
     listen(lst_fd, 5);
     
     while(1){
-        viewcards=getlist();
 
         /*add player*/
         pfd=accept(lst_fd, NULL, NULL);
@@ -159,6 +208,8 @@ void *accept_thread(void *pass){
         /*adds player one to the list*/
         addplayer(pfd);
         printf("Added player to list!\n");
+
+        /*colour attribution*/
         initcolour(i);
         printlist();
         i++;
@@ -167,22 +218,22 @@ void *accept_thread(void *pass){
         write(pfd, &dim, sizeof(dim));
         printf("Dim sent!\n");
 
-        
-
-
+        /*send current state of the board*/
         sendstate(pfd);
 
+        if(countlist()==1) {
+        	write(pfd, &resp, sizeof(resp));
+        }
+        else if(countlist()==2){
+        	write(getlist()->next->pfd, &i, sizeof(int));
+        }
+        /*create thread to player*/
         pthread_create(&getlist()->plays_thread, NULL, plays, getlist());
         
     }
 }
 
 int main(int argc, char * argv[]){
-
-
-    /*guardar fd de players(depois lista quiçá)*/	
-    int pfd, nsec=0;
-    struct colour c[5];
 
     /*verificação argumentos de entrada para dim*/
     if(argc<2){
@@ -198,26 +249,32 @@ int main(int argc, char * argv[]){
     /*init board*/
     init_board(dim);
 
+    /*pointer to pass in thread*/
     int *pass;
     pass=malloc(sizeof(int));
     *pass=dim;
 
+	/*create thread to accept new connections*/
     pthread_t lst_thread;
-    /*create thread to accept new connections*/
     pthread_create(&lst_thread, NULL, accept_thread, pass);
     
-    while(1){
+
+    /*game cycle*/
+    while(!bye){
         while(!done){
         
         }
-        sleep(10);
-        init_board(dim);
-        done=0;
-        setscore();
+        /*game ended and another begins*/
+        if(bye!=1){
+        	sleep(10);
+        	init_board(dim);
+        	done=0;
+        	setscore();
+        }   
     }
 
 
-                            /******SAÍDA DO PROGRAMA!******/
+    /*game exit*/
     pthread_kill(lst_thread, SIGUSR1);
     pthread_join(lst_thread, NULL);
 

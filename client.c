@@ -13,19 +13,26 @@
 
 #define PORT 3000
 
-int done=0;
+int done=0, wait=0;
+
+void recvcolour(int *r, int *g, int *b, int sfd){
+    read(sfd, r, sizeof(int));
+    read(sfd, g, sizeof(int));
+    read(sfd, b, sizeof(int));
+}
 
 int fillboard(int sfd){
     int x, y, r, g, b;
     int i=0;
-    char vaux[3], colour[8];
+    char vaux[3], colour[14];
     card rcvcard;
 
 
     read(sfd, &i, sizeof(i));
     if(i>1){
-        read(sfd, colour, sizeof(colour));
-        sscanf(colour, "%d %d %d\n", &r, &g, &b);
+        //read(sfd, colour, sizeof(colour));
+        //sscanf(colour, "%d %d %d\n", &r, &g, &b);
+        recvcolour(&r, &g, &b, sfd);
         printf("Colour received: %d %d %d\n", r, g, b);
     }
     
@@ -45,8 +52,10 @@ int fillboard(int sfd){
         /*reaches the end of cards belonging to one player
         exits to change colour*/
         if(x==-2 && y==-2){
-            read(sfd, colour, sizeof(colour));
-            sscanf(colour, "%d %d %d\n", &r, &g, &b);
+            /*read(sfd, colour, sizeof(colour));
+            printf("Colour received: %d %d %d\n", r, g, b);
+            sscanf(colour, "%d %d %d\n", &r, &g, &b);*/
+            recvcolour(&r, &g, &b, sfd);
         }else{
             paint_card(x, y, r, g, b);
             write_card(x, y, vaux, 0, 0, 0);
@@ -61,23 +70,27 @@ void *listenserver(void *pass){
     int sfd=*sfdpointer;*/
     
     int sfd=*(int*) pass;
-    int r, g, b;
-    char plays[8];
-    plays[0]='\0';
+    int r, g, b, x, y, check;
+
     
     play_response resp;
     while(!done){
         /*receives play response*/
         
         read(sfd, &resp, sizeof(resp));
-        read(sfd, plays, sizeof(plays));
+        /*read(sfd, plays, sizeof(plays));
         sscanf(plays, "%d %d %d\n", &r, &g, &b);
-        printf("r: %d g: %d b: %d\n", r, g, b);
-        printf("code in resp: %d\n", resp.code);
+        printf("colour vector: %s\n", plays);
+        printf("colour: %d %d %d\n", r, g, b);*/
+        printf("Resp code: %d\n", resp.code);
+        if (resp.code!=-4) recvcolour(&r, &g, &b, sfd);
+        
 
         /*switch case response code*/
         switch (resp.code) {
             case 1:
+                x=resp.play1[0];
+                y=resp.play1[1];
                 paint_card(resp.play1[0], resp.play1[1] , r, g, b);
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 200, 200, 200);
                 break;
@@ -101,8 +114,13 @@ void *listenserver(void *pass){
                 break;
             case -1:
                 /*case 2nd card is not pick after 5 seconds*/
+                //printf("in case -1 x:%d   y:%d\n", x, y);
                 paint_card(resp.play1[0], resp.play1[1], 255, 255, 255);
                 write_card(resp.play1[0], resp.play1[1], resp.str_play1, 255, 255, 255);
+            case -4:
+                wait=1;
+                read(sfd, &check, sizeof(check));
+                wait=0;
         }
     }
     //return 0;
@@ -114,7 +132,7 @@ void *listenserver(void *pass){
 
 int main(int argc, char * argv[]){
     
-    int dim, close=0, r, score;
+    int dim, end=0, r, score;
     
     /*init events*/
     SDL_Event event;
@@ -172,39 +190,41 @@ int main(int argc, char * argv[]){
     *pass=sfd;
     //pthread_create(&lst_thread, NULL, listenserver, pass);
     
-    while(!close){
+    while(!end){
         pthread_create(&lst_thread, NULL, listenserver, pass);
         while(!done){
             while(SDL_PollEvent(&event)){
                 switch(event.type){
                     case SDL_QUIT: {
-                        done=SDL_TRUE;
-                        close=SDL_TRUE;
+                        done=1;//SDL_TRUE;
+                        end=1;//SDL_TRUE;
+                        printf("Leaving the game!\n");
                         break;
                     }
                     case SDL_MOUSEBUTTONDOWN:{
                         /*gets the x and y from button and sends to server*/
                         int board_x, board_y;
                         get_board_card(event.button.x, event.button.y, &board_x, &board_y);
-                        write(sfd, &board_x, sizeof(board_x));
-                        write(sfd, &board_y, sizeof(board_y));
+                        if(wait!=1)write(sfd, &board_x, sizeof(board_x));
+                        if(wait!=1)write(sfd, &board_y, sizeof(board_y));
                     }
                 }
             } 
         }
-
-        read(sfd, &score, sizeof(score));
-        if(score!=0) printf("WINNER SCORE: %d\n", score);
-        else printf("GAME OVER!\n");
-        done=0;
-        close_board_windows();
-        sleep(10);
-        create_board_window(300, 300, dim);
+        if(end!=1){
+            read(sfd, &score, sizeof(score));
+            if(score!=0) printf("WINNER SCORE: %d\n", score);
+            else printf("GAME OVER!\n");
+            done=0;
+            close_board_windows();
+            sleep(10);
+            create_board_window(300, 300, dim);
+        }
     }
     
     printf("fim\n");
     close_board_windows();
-    
+    close(sfd);
     free(pass);
     
 }
